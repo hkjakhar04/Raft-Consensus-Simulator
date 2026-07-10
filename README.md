@@ -2,7 +2,7 @@
 
 > A high-performance, real-time distributed systems visualizer implementing the Raft Consensus Algorithm from scratch in C++.
 
-![Raft Simulator Demo](./images/raf.gif) *(Placeholder for Demo GIF)*
+![Raft Simulator Demo](./images/raf.gif) 
 
 ---
 
