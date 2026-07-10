@@ -1,0 +1,47 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <optional>
+
+namespace raft {
+
+enum class NodeState {
+    FOLLOWER,
+    CANDIDATE,
+    LEADER
+};
+
+struct LogEntry {
+    int term;
+    std::string command;
+};
+
+// Simulated RPCs (Usually these are serialized, but for an in-memory simulation we use structs)
+struct RequestVoteArgs {
+    int term;
+    int candidateId;
+    int lastLogIndex;
+    int lastLogTerm;
+};
+
+struct RequestVoteReply {
+    int term;
+    bool voteGranted;
+};
+
+struct AppendEntriesArgs {
+    int term;
+    int leaderId;
+    int prevLogIndex;
+    int prevLogTerm;
+    std::vector<LogEntry> entries;
+    int leaderCommit;
+};
+
+struct AppendEntriesReply {
+    int term;
+    bool success;
+};
+
+} // namespace raft
