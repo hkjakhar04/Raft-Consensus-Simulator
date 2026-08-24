@@ -7,6 +7,7 @@
 #include <mutex>
 #include <random>
 #include <sstream>
+#include <cstdlib>
 
 // If Crow is not installed globally, you will need to add it to your CMakeLists.txt via FetchContent.
 #include "crow.h"
@@ -162,10 +163,13 @@ int main() {
             }
         });
 
-    std::cout << "Starting Telemetry Server on ws://localhost:8080/raft\n";
+    const char* env_port = std::getenv("PORT");
+    int port = env_port ? std::stoi(env_port) : 8080;
+    
+    std::cout << "Starting Telemetry Server on ws://0.0.0.0:" << port << "/raft\n";
     std::cout << "Press Ctrl+C to terminate the cluster..." << std::endl;
     // Block the main thread and run the web server
-    app.port(8080).multithreaded().run();
+    app.port(port).bindaddr("0.0.0.0").multithreaded().run();
     
     // Fallback blocking mechanism in case app.run() returns asynchronously
     while (true) {

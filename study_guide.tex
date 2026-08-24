@@ -1,0 +1,1136 @@
+\documentclass[11pt, a4paper]{article}
+
+% =====================================================================
+% PACKAGES
+% =====================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\geometry{a4paper, left=25mm, right=25mm, top=25mm, bottom=25mm}
+
+% =====================================================================
+% COLOR THEME
+% =====================================================================
+\definecolor{codegreen}{rgb}{0,0.55,0}
+\definecolor{codegray}{rgb}{0.4,0.4,0.4}
+\definecolor{codepurple}{rgb}{0.5,0,0.75}
+\definecolor{codeblue}{rgb}{0.0,0.2,0.75}
+\definecolor{backcolour}{rgb}{0.96,0.96,0.94}
+\definecolor{accentblue}{rgb}{0.1,0.2,0.6}
+
+% =====================================================================
+% LISTINGS STYLES
+% =====================================================================
+\lstdefinestyle{cppstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true, captionpos=b, keepspaces=true,
+    numbers=left, numbersep=6pt,
+    showspaces=false, showstringspaces=false,
+    tabsize=2, frame=single, rulecolor=\color{codegray},
+    language=C++
+}
+
+\lstdefinestyle{tsstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true, captionpos=b, keepspaces=true,
+    numbers=left, numbersep=6pt,
+    showspaces=false, showstringspaces=false,
+    tabsize=2, frame=single, rulecolor=\color{codegray},
+    language=Java,
+    morekeywords={const,let,interface,export,from,import,type,
+                  useState,useEffect,useRef,useDispatch,useSelector,
+                  PayloadAction,createSlice,configureStore,React}
+}
+
+\lstdefinestyle{bashstyle}{
+    backgroundcolor=\color{backcolour},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true, captionpos=b,
+    frame=single, rulecolor=\color{codegray},
+    numbers=none, showstringspaces=false, language=bash
+}
+
+\lstset{style=cppstyle}
+
+% =====================================================================
+% HYPERREF
+% =====================================================================
+\hypersetup{
+    colorlinks=true, linkcolor=accentblue, urlcolor=accentblue,
+    pdftitle={Raft Consensus Simulator: A Step-by-Step Guide},
+}
+
+% =====================================================================
+% SECTION FORMATTING
+% =====================================================================
+\titleformat{\section}[block]
+  {\Large\bfseries\color{accentblue}}{\thesection}{1em}{}[\titlerule]
+\titleformat{\subsection}[block]
+  {\large\bfseries}{\thesubsection}{1em}{}
+
+% =====================================================================
+% DOCUMENT
+% =====================================================================
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+    {\Huge\bfseries\color{accentblue} Raft Consensus Simulator\par}
+    \vspace{0.5cm}
+    {\Large A Step-by-Step Implementation Guide\par}
+    \vspace{1cm}
+    \rule{0.6\textwidth}{1pt}
+    \vspace{1cm}
+    {\large A comprehensive walkthrough of building a full-stack,
+    real-time distributed systems simulator from scratch, covering
+    C++17 multithreading, WebSocket telemetry, and React state
+    visualization.\par}
+    \vfill
+    {\large \today\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Step 1: Project Architecture and Technology Selection}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+Before writing a single line of code, the most consequential engineering
+decisions must be made: \textit{what to build, with what tools, and why}.
+The Raft Consensus Simulator is a full-stack application with two
+fundamentally distinct concerns. The first is the \textbf{consensus
+engine}---a correct, high-performance implementation of the Raft
+algorithm---which demands deterministic timing and direct control over
+threads. The second is the \textbf{visualization layer}---a real-time UI
+that renders the cluster's live state---which demands a reactive,
+component-driven architecture.
+
+The central design insight is that these two concerns must be rigorously
+decoupled. If the visualization logic were embedded in the consensus engine,
+or vice versa, the system would be fragile and impossible to test. The
+solution is a clean, bidirectional bridge: a WebSocket connection.
+
+\subsection{The Building Process}
+The architecture is divided into two independent, runnable services:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Backend} (\texttt{/backend}): A C++17 process housing
+          all Raft logic, threading, and a Crow-powered WebSocket server.
+    \item \textbf{Frontend} (\texttt{/frontend}): A Vite/React/TypeScript
+          SPA that connects to the backend WebSocket and renders live state.
+\end{enumerate}
+
+\subsection{Implementation Details}
+\textbf{Why C++17?} The Raft algorithm's correctness depends on timing:
+election timeouts must fire within precise, randomized windows.
+Garbage-collected runtimes (Java, Go) introduce non-deterministic GC pauses
+that can trigger spurious elections. C++ guarantees deterministic execution,
+and \texttt{std::thread} / \texttt{std::mutex} provide the exact primitives
+needed to map each Raft node onto a dedicated OS thread.
+
+\textbf{Why React + Redux Toolkit?} The frontend receives 30+ state updates
+per second during elections. Naively piping these into \texttt{useState}
+would trigger a full component-tree re-render on every message. Redux
+Toolkit, backed by Immer.js, merges incoming data into an immutable global
+state tree; React's diffing algorithm then re-renders only the components
+whose data actually changed.
+
+\textbf{Why WebSockets?} HTTP polling introduces latency and wasted
+bandwidth. WebSockets establish a persistent, full-duplex TCP tunnel: the
+backend \textit{pushes} telemetry events the moment they occur, and the
+frontend can \textit{push} fault-injection commands back through the same
+connection.
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={backend/CMakeLists.txt}]
+cmake_minimum_required(VERSION 3.14)
+project(RaftSimulator)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(Threads REQUIRED)
+add_executable(RaftSimulator
+    src/main.cpp
+    src/raft_core/Node.cpp
+)
+target_include_directories(RaftSimulator PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/raft_core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/telemetry
+)
+target_link_libraries(RaftSimulator PRIVATE Threads::Threads)
+\end{lstlisting}
+
+\begin{lstlisting}[style=bashstyle, caption={Direct g++ compilation (Windows)}]
+g++ -I./src -I./asio-asio-1-28-0/asio/include -o raft_simulator.exe \
+    src/main.cpp src/raft_core/Node.cpp -lpthread -lws2_32 -lwsock32
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 2: Defining the Raft Data Model (Types.h)}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+The Raft protocol is a \textbf{replicated state machine}. Every node must
+maintain an identical log of commands, and the consensus algorithm ensures
+this log stays consistent across the cluster even during failures. Before
+implementing any behavior, the data structures that represent this protocol
+must be defined precisely. These types are the shared language that all
+components of the system speak.
+
+\subsection{The Building Process}
+All protocol-level types are centralized in
+\texttt{backend/src/raft\_core/Types.h}. This file defines no behavior---it
+only defines \textit{what the data looks like}. This avoids circular
+dependencies between \texttt{Node.h} and \texttt{main.cpp}.
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{NodeState:} A scoped \texttt{enum class} with three
+          values---\texttt{FOLLOWER}, \texttt{CANDIDATE}, \texttt{LEADER}.
+          Scoped enums prevent name collisions and force explicit
+          qualification (e.g., \texttt{NodeState::LEADER}).
+    \item \textbf{LogEntry:} The fundamental unit of the replicated log.
+          Stores the \texttt{term} in which it was created and the
+          \texttt{command} string. The term is essential for Raft's safety
+          proof: a leader can only commit entries from its current term.
+    \item \textbf{RPC Structs:} \texttt{RequestVoteArgs/Reply} and
+          \texttt{AppendEntriesArgs/Reply} define payload schemas for Raft's
+          two core RPCs. In a real system these would be serialized to bytes;
+          here they are passed directly as C++ structs between threads.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={backend/src/raft\_core/Types.h}]
+#pragma once
+#include <string>
+#include <vector>
+#include <optional>
+
+namespace raft {
+
+enum class NodeState { FOLLOWER, CANDIDATE, LEADER };
+
+struct LogEntry {
+    int term;
+    std::string command;
+};
+
+struct RequestVoteArgs {
+    int term; int candidateId;
+    int lastLogIndex; int lastLogTerm;
+};
+struct RequestVoteReply { int term; bool voteGranted; };
+
+struct AppendEntriesArgs {
+    int term; int leaderId;
+    int prevLogIndex; int prevLogTerm;
+    std::vector<LogEntry> entries;
+    int leaderCommit;
+};
+struct AppendEntriesReply { int term; bool success; };
+
+} // namespace raft
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 3: The Thread-Safe Telemetry Infrastructure}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+The C++ backend has two categories of threads running concurrently:
+\textbf{Node threads} (run Raft logic, produce state-change events) and a
+\textbf{Network I/O thread} (runs the Crow WebSocket server). These must
+communicate without data races. The solution is the
+\textbf{Producer-Consumer pattern}: nodes push events into a shared queue;
+a dedicated consumer pops events and broadcasts them over WebSocket.
+
+\subsection{The Building Process}
+Two files define the infrastructure:
+\begin{itemize}[leftmargin=*]
+    \item \texttt{TelemetryTypes.h} --- the \texttt{RaftStateEvent} payload.
+    \item \texttt{ThreadSafeQueue.h} --- a generic mutex-backed queue template.
+\end{itemize}
+
+\subsection{Implementation Details}
+\textbf{ThreadSafeQueue} wraps \texttt{std::queue<T>} with a
+\texttt{std::mutex} and \texttt{std::condition\_variable}.
+\texttt{push()} uses \texttt{std::lock\_guard} (RAII: the mutex is
+released on scope exit even if an exception is thrown) and calls
+\texttt{m\_cond.notify\_one()} to wake exactly one sleeping consumer.
+
+\texttt{wait\_and\_pop()} uses \texttt{std::unique\_lock} (can temporarily
+release the lock). \texttt{m\_cond.wait(lock, predicate)} atomically
+releases the lock and sleeps until both \texttt{notify\_one()} fires AND
+the predicate \texttt{!m\_queue.empty()} is true, guarding against
+\textbf{spurious wakeups}.
+
+The copy constructor and assignment operator are explicitly
+\texttt{= delete}d because \texttt{std::mutex} is non-copyable.
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={backend/src/telemetry/ThreadSafeQueue.h}]
+#pragma once
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+
+namespace telemetry {
+
+template <typename T>
+class ThreadSafeQueue {
+public:
+    ThreadSafeQueue() = default;
+    ~ThreadSafeQueue() = default;
+    ThreadSafeQueue(const ThreadSafeQueue&) = delete;
+    ThreadSafeQueue& operator=(const ThreadSafeQueue&) = delete;
+
+    void push(T value) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_queue.push(std::move(value));
+        m_cond.notify_one();
+    }
+
+    bool try_pop(T& value) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_queue.empty()) return false;
+        value = std::move(m_queue.front());
+        m_queue.pop();
+        return true;
+    }
+
+    void wait_and_pop(T& value) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_cond.wait(lock, [this] { return !m_queue.empty(); });
+        value = std::move(m_queue.front());
+        m_queue.pop();
+    }
+
+private:
+    std::queue<T>           m_queue;
+    mutable std::mutex      m_mutex;
+    std::condition_variable m_cond;
+};
+
+} // namespace telemetry
+\end{lstlisting}
+
+\begin{lstlisting}[style=cppstyle, caption={backend/src/telemetry/TelemetryTypes.h}]
+#pragma once
+#include "../raft_core/Types.h"
+#include <string>
+#include <vector>
+
+namespace telemetry {
+
+enum class EventType {
+    STATE_TRANSITION, ELECTION_STARTED, VOTE_CAST
+};
+
+struct RaftStateEvent {
+    int nodeId;
+    EventType type;
+    int currentTerm;
+    raft::NodeState role;
+    int commitIndex;
+    std::string message;
+    bool isCrashed = false;
+    std::vector<raft::LogEntry> logEntries;
+};
+
+} // namespace telemetry
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 4: The Node Class Interface (Node.h)}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+The \texttt{Node} class is the central abstraction of the entire system,
+modeling a single server in the distributed cluster. Its public interface
+defines what the outside world can do to a node, while private members
+enforce strict encapsulation of internal Raft state.
+
+\subsection{The Building Process}
+\texttt{Node.h} declares the class with three state categories directly
+mirroring the Raft paper:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Persistent state}: \texttt{m\_currentTerm},
+          \texttt{m\_votedFor}, \texttt{m\_log} (must survive crashes).
+    \item \textbf{Volatile state}: \texttt{m\_commitIndex},
+          \texttt{m\_lastApplied}, \texttt{m\_state} (reconstructable).
+    \item \textbf{Volatile leader state}: \texttt{m\_nextIndex},
+          \texttt{m\_matchIndex} (initialized fresh on each election win).
+\end{itemize}
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Atomic booleans}: \texttt{m\_running} and
+          \texttt{m\_isCrashed} are \texttt{std::atomic<bool>}, supporting
+          lock-free, indivisible read-modify-write operations across threads.
+    \item \textbf{std::optional}: \texttt{m\_votedFor} is
+          \texttt{std::optional<int>}---a node either has voted for someone
+          or has not voted (\texttt{std::nullopt}). More expressive and
+          safer than a \texttt{-1} sentinel.
+    \item \textbf{Dependency Injection}: RPC dispatchers are
+          \texttt{std::function} objects injected from \texttt{main.cpp}.
+          The node does not know \textit{how} RPCs are delivered, cleanly
+          separating the algorithm from the networking layer.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={backend/src/raft\_core/Node.h}]
+#pragma once
+#include "Types.h"
+#include "../telemetry/TelemetryTypes.h"
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <chrono>
+#include <functional>
+#include <map>
+
+namespace raft {
+
+class Node {
+public:
+    Node(int id, const std::vector<int>& peerIds);
+    ~Node();
+    void start(); void stop();
+    RequestVoteReply requestVote(const RequestVoteArgs& args);
+    AppendEntriesReply appendEntries(const AppendEntriesArgs& args);
+    void setRpcHandler(
+        std::function<RequestVoteReply(int, const RequestVoteArgs&)>,
+        std::function<AppendEntriesReply(int, const AppendEntriesArgs&)>
+    );
+    void setTelemetryCallback(
+        std::function<void(const telemetry::RaftStateEvent&)> cb);
+    void forceSyncTelemetry();
+    void crash(); void recover();
+    void clientRequest(const std::string& command);
+
+private:
+    void emitTelemetry(telemetry::EventType type,
+                       const std::string& message = "");
+    void run(); void resetElectionTimer();
+    void startElection(); void becomeFollower(int term);
+    void becomeLeader();
+
+    int m_id; std::vector<int> m_peerIds;
+    std::atomic<bool> m_running{false};
+    std::atomic<bool> m_isCrashed{false};
+    std::thread m_workerThread;
+    std::mutex m_mutex; std::condition_variable m_cv;
+
+    // Persistent Raft state
+    int m_currentTerm = 0;
+    std::optional<int> m_votedFor;
+    std::vector<LogEntry> m_log;
+
+    // Volatile Raft state
+    int m_commitIndex = 0; int m_lastApplied = 0;
+    NodeState m_state = NodeState::FOLLOWER;
+
+    // Volatile leader state
+    std::map<int,int> m_nextIndex; std::map<int,int> m_matchIndex;
+
+    std::chrono::time_point<std::chrono::steady_clock> m_lastHeartbeat;
+    std::chrono::milliseconds m_electionTimeout;
+
+    std::function<RequestVoteReply(int, const RequestVoteArgs&)>
+        sendRequestVote;
+    std::function<AppendEntriesReply(int, const AppendEntriesArgs&)>
+        sendAppendEntries;
+    std::function<void(const telemetry::RaftStateEvent&)>
+        m_telemetryCallback;
+};
+
+} // namespace raft
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 5: The Node Lifecycle---Run Loop and Leader Election}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+A Raft node starts as a \textbf{Follower}. If it hears nothing within its
+election timeout, it promotes itself to \textbf{Candidate} and launches an
+election. If it wins (receives votes from a strict majority), it becomes
+\textbf{Leader}. The quorum requirement makes this safe:
+\begin{equation}
+    Q = \left\lfloor \frac{N}{2} \right\rfloor + 1
+\end{equation}
+Any two majorities overlap by at least one node, making it
+\textit{mathematically impossible} for two leaders to be elected in the
+same term.
+
+\subsection{The Building Process}
+Three methods implement this lifecycle in \texttt{Node.cpp}:
+\begin{enumerate}[leftmargin=*]
+    \item \texttt{run()} -- the main loop; checks the election timer.
+    \item \texttt{resetElectionTimer()} -- randomizes the timeout.
+    \item \texttt{startElection()} -- transitions to Candidate and
+          dispatches concurrent \texttt{RequestVote} RPCs.
+\end{enumerate}
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Randomized timeouts:} \texttt{thread\_local std::mt19937}
+          gives each thread its own independent Mersenne Twister PRNG,
+          avoiding contention on a global object. Timeouts range 150--300ms.
+    \item \textbf{Fire-and-forget RPCs:} A new \texttt{std::thread} is
+          launched per peer and immediately \texttt{.detach()}ed. The RPC
+          call blocks \textit{inside} the thread while the node thread stays
+          responsive.
+    \item \textbf{Stale state protection:} After a detached thread receives
+          a reply, it re-acquires the mutex and verifies the node is still a
+          Candidate for the same term before processing the vote.
+    \item \textbf{Shared vote counter:} \texttt{std::make\_shared<int>(1)}
+          captured by value lets multiple concurrent threads safely share
+          and increment the counter once they hold the lock.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={Node.cpp --- run() and resetElectionTimer()}]
+void Node::run() {
+    while (m_running) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        auto now = std::chrono::steady_clock::now();
+        if (!m_isCrashed && m_state != NodeState::LEADER
+            && now - m_lastHeartbeat >= m_electionTimeout)
+        {
+            startElection();
+        }
+        m_cv.wait_for(lock, std::chrono::milliseconds(50),
+            [this]() { return !m_running; });
+    }
+}
+
+void Node::resetElectionTimer() {
+    static thread_local std::mt19937
+        generator(std::random_device{}());
+    std::uniform_int_distribution<int> dist(150, 300);
+    m_electionTimeout = std::chrono::milliseconds(dist(generator));
+    m_lastHeartbeat = std::chrono::steady_clock::now();
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=cppstyle, caption={Node.cpp --- startElection()}]
+void Node::startElection() {
+    m_state = NodeState::CANDIDATE;
+    m_currentTerm++; m_votedFor = m_id;
+    resetElectionTimer();
+
+    RequestVoteArgs args;
+    args.term        = m_currentTerm; args.candidateId = m_id;
+    args.lastLogIndex = m_log.empty() ? 0 : (int)m_log.size();
+    args.lastLogTerm  = m_log.empty() ? 0 : m_log.back().term;
+
+    auto votesGranted = std::make_shared<int>(1);
+    int majority = (m_peerIds.size() + 1) / 2;
+
+    for (int peerId : m_peerIds) {
+        std::thread([this, peerId, args, votesGranted, majority]() {
+            RequestVoteReply reply = sendRequestVote(peerId, args);
+
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_state != NodeState::CANDIDATE
+                || m_currentTerm != args.term) return; // Stale
+
+            if (reply.term > m_currentTerm) {
+                becomeFollower(reply.term); return;
+            }
+            if (reply.voteGranted) {
+                (*votesGranted)++;
+                if (*votesGranted > majority) becomeLeader();
+            }
+        }).detach();
+    }
+}
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 6: The RequestVote and AppendEntries RPCs}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+The two RPCs are the only means of inter-node communication in Raft.
+\textbf{RequestVote} is called during elections. \textbf{AppendEntries}
+serves a dual purpose: replicating log entries and acting as a periodic
+heartbeat that suppresses elections. These two functions collectively encode
+the entire Raft safety model.
+
+\subsection{Implementation Details}
+\textbf{RequestVote receiver:}
+\begin{enumerate}[leftmargin=*]
+    \item Refuse if crashed (simulates a severed connection).
+    \item Refuse if the candidate's term is stale.
+    \item If the candidate's term is newer, step down to Follower (Term
+          Ascendancy Rule).
+    \item Grant the vote only if we haven't voted yet AND the candidate's
+          log is at least as up-to-date as ours (Leader Completeness
+          Property).
+\end{enumerate}
+
+\textbf{AppendEntries receiver:}
+\begin{enumerate}[leftmargin=*]
+    \item Refuse if crashed or if sender's term is stale.
+    \item Step down to Follower and reset the election timer (heartbeat).
+    \item Perform the \textbf{Log Consistency Check}: verify log contains
+          an entry at \texttt{prevLogIndex} with term \texttt{prevLogTerm}.
+          If not, return failure so the leader retries with an older index.
+    \item Append new entries, first deleting any conflicting ones.
+    \item Advance \texttt{m\_commitIndex} if \texttt{leaderCommit} is greater.
+\end{enumerate}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={Node.cpp --- requestVote()}]
+RequestVoteReply Node::requestVote(const RequestVoteArgs& args) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    RequestVoteReply reply;
+    reply.term = m_currentTerm; reply.voteGranted = false;
+
+    if (m_isCrashed)               return reply;
+    if (args.term < m_currentTerm) return reply;
+    if (args.term > m_currentTerm) becomeFollower(args.term);
+
+    if (!m_votedFor.has_value()
+        || m_votedFor.value() == args.candidateId)
+    {
+        int lastLogTerm  = m_log.empty() ? 0 : m_log.back().term;
+        int lastLogIndex = m_log.empty() ? 0 : (int)m_log.size();
+        bool logIsUpToDate =
+            (args.lastLogTerm > lastLogTerm) ||
+            (args.lastLogTerm == lastLogTerm
+             && args.lastLogIndex >= lastLogIndex);
+        if (logIsUpToDate) {
+            m_votedFor = args.candidateId;
+            reply.voteGranted = true;
+            resetElectionTimer();
+        }
+    }
+    reply.term = m_currentTerm;
+    return reply;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=cppstyle, caption={Node.cpp --- appendEntries()}]
+AppendEntriesReply Node::appendEntries(const AppendEntriesArgs& args){
+    std::lock_guard<std::mutex> lock(m_mutex);
+    AppendEntriesReply reply;
+    reply.term = m_currentTerm; reply.success = false;
+
+    if (m_isCrashed)               return reply;
+    if (args.term < m_currentTerm) return reply;
+    if (args.term > m_currentTerm || m_state != NodeState::FOLLOWER)
+        becomeFollower(args.term);
+
+    resetElectionTimer(); // Leader is alive
+
+    if (args.prevLogIndex > (int)m_log.size()) return reply;
+    if (args.prevLogIndex > 0
+        && m_log[args.prevLogIndex-1].term != args.prevLogTerm)
+        return reply;
+
+    reply.success = true; reply.term = m_currentTerm;
+
+    int index = args.prevLogIndex;
+    for (const auto& entry : args.entries) {
+        index++;
+        if ((int)m_log.size() >= index) {
+            if (m_log[index-1].term != entry.term) {
+                m_log.erase(m_log.begin()+index-1, m_log.end());
+                m_log.push_back(entry);
+            }
+        } else { m_log.push_back(entry); }
+    }
+
+    if (args.leaderCommit > m_commitIndex)
+        m_commitIndex = std::min(args.leaderCommit,(int)m_log.size());
+
+    return reply;
+}
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 7: Leader Heartbeats, Log Replication, and Commitment}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+After winning an election, the leader must broadcast \texttt{AppendEntries}
+heartbeats every 50ms to suppress follower timeouts. When a client mutation
+arrives, the leader appends it to its own log and replicates it. Once a
+majority quorum have written the entry, the leader advances its
+\texttt{commitIndex} and the command is durably committed.
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Term-pinned heartbeat thread:} The background thread
+          captures \texttt{termAtElection} and exits if the term changes,
+          preventing stale threads from interfering with a new leadership.
+    \item \textbf{nextIndex / matchIndex:} \texttt{m\_nextIndex[peer]}
+          tracks the next log index to send; \texttt{m\_matchIndex[peer]}
+          tracks the highest index confirmed replicated. On failure, the
+          leader decrements \texttt{nextIndex} and retries.
+    \item \textbf{Quorum commit:} The leader scans backwards for the highest
+          index $n$ where \texttt{log[n-1].term == currentTerm} and a
+          majority of nodes have \texttt{matchIndex $\geq$ n}.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={Node.cpp --- becomeLeader() and clientRequest()}]
+void Node::becomeLeader() {
+    m_state = NodeState::LEADER;
+    for (int p : m_peerIds) {
+        m_nextIndex[p]  = m_log.size() + 1;
+        m_matchIndex[p] = 0;
+    }
+
+    std::thread([this, termAtElection = m_currentTerm]() {
+        while (m_running) {
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                if (m_state!=NodeState::LEADER
+                    || m_currentTerm!=termAtElection) break;
+                if (m_isCrashed) continue;
+
+                for (int peerId : m_peerIds) {
+                    AppendEntriesArgs args;
+                    args.term = m_currentTerm; args.leaderId = m_id;
+                    args.leaderCommit = m_commitIndex;
+                    int nextIdx = m_nextIndex[peerId];
+                    args.prevLogIndex = nextIdx - 1;
+                    args.prevLogTerm =
+                        (args.prevLogIndex > 0
+                         && args.prevLogIndex <= (int)m_log.size())
+                        ? m_log[args.prevLogIndex-1].term : 0;
+                    if (nextIdx>0 && nextIdx<=(int)m_log.size())
+                        args.entries = std::vector<LogEntry>(
+                            m_log.begin()+nextIdx-1, m_log.end());
+                    else args.entries = {};
+
+                    std::thread([this, peerId, args]() {
+                        AppendEntriesReply reply =
+                            sendAppendEntries(peerId, args);
+                        std::lock_guard<std::mutex> lock(m_mutex);
+                        if (m_state!=NodeState::LEADER
+                            || m_currentTerm!=args.term) return;
+                        if (reply.term > m_currentTerm) {
+                            becomeFollower(reply.term); return;
+                        }
+                        if (reply.success) {
+                            int mi = args.prevLogIndex
+                                    +(int)args.entries.size();
+                            if (mi > m_matchIndex[peerId]) {
+                                m_matchIndex[peerId] = mi;
+                                m_nextIndex[peerId]  = mi + 1;
+                                for (int n=(int)m_log.size();
+                                     n>m_commitIndex; --n) {
+                                    if(m_log[n-1].term==m_currentTerm){
+                                        int cnt=1;
+                                        for(int p:m_peerIds)
+                                            if(m_matchIndex[p]>=n)cnt++;
+                                        if(cnt>(int)(m_peerIds.size()+1)/2){
+                                            m_commitIndex=n; break;
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            m_nextIndex[peerId] =
+                                std::max(1,m_nextIndex[peerId]-1);
+                        }
+                    }).detach();
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }).detach();
+}
+
+void Node::clientRequest(const std::string& command) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_state != NodeState::LEADER || m_isCrashed) return;
+    m_log.push_back({m_currentTerm, command});
+    emitTelemetry(telemetry::EventType::STATE_TRANSITION,
+                  "Appended client request");
+}
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 8: The Orchestrator---main.cpp}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+\texttt{main.cpp} is the glue layer: it instantiates all nodes, wires them
+together via Dependency Injection, launches the telemetry consumer thread,
+and runs the Crow WebSocket server. It contains no Raft algorithm logic.
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{RPC wiring:} Lambdas capture \texttt{\&nodes} by reference
+          and call \texttt{simulateNetworkLatency()} before dispatching to
+          \texttt{nodes[targetId-1]->requestVote(args)}---a direct function
+          call across a thread boundary simulating a network round-trip.
+    \item \textbf{onopen:} Inserts the new connection pointer and calls
+          \texttt{forceSyncTelemetry()} so the new client immediately sees
+          full cluster state.
+    \item \textbf{onmessage routing:} \texttt{CLIENT\_REQUEST} is broadcast
+          to all nodes (only the leader processes it internally).
+          \texttt{CRASH\_NODE} / \texttt{RECOVER\_NODE} target a specific
+          node by integer ID.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=cppstyle, caption={backend/src/main.cpp --- Orchestrator (abridged)}]
+int main() {
+    telemetry::ThreadSafeQueue<telemetry::RaftStateEvent> queue;
+
+    const int N = 5;
+    std::vector<std::shared_ptr<Node>> nodes;
+    for (int i = 1; i <= N; ++i) {
+        std::vector<int> peers;
+        for (int j = 1; j <= N; ++j) if (i!=j) peers.push_back(j);
+        nodes.push_back(std::make_shared<Node>(i, peers));
+    }
+
+    for (int i = 0; i < N; ++i) {
+        nodes[i]->setRpcHandler(
+            [&nodes](int id, const RequestVoteArgs& a) {
+                simulateNetworkLatency();
+                return nodes[id-1]->requestVote(a); },
+            [&nodes](int id, const AppendEntriesArgs& a) {
+                simulateNetworkLatency();
+                return nodes[id-1]->appendEntries(a); }
+        );
+        nodes[i]->setTelemetryCallback(
+            [&queue](const telemetry::RaftStateEvent& ev) {
+                queue.push(ev); }
+        );
+    }
+
+    std::mutex mtx;
+    std::unordered_set<crow::websocket::connection*> clients;
+
+    std::thread([&]() {
+        while (true) {
+            telemetry::RaftStateEvent ev;
+            queue.wait_and_pop(ev);
+            // ... serialize ev to JSON string payload ...
+            std::lock_guard<std::mutex> lock(mtx);
+            for (auto* c : clients) c->send_text(payload);
+        }
+    }).detach();
+
+    for (auto& n : nodes) n->start();
+
+    crow::SimpleApp app;
+    CROW_WEBSOCKET_ROUTE(app, "/raft")
+        .onopen([&](crow::websocket::connection& c) {
+            std::lock_guard<std::mutex> lock(mtx);
+            clients.insert(&c);
+            for (auto& n : nodes) n->forceSyncTelemetry();
+        })
+        .onclose([&](crow::websocket::connection& c, const std::string&){
+            std::lock_guard<std::mutex> lock(mtx);
+            clients.erase(&c);
+        })
+        .onmessage([&nodes](crow::websocket::connection&,
+                            const std::string& data, bool) {
+            auto p = crow::json::load(data);
+            if (!p) return;
+            if (p.has("command")) {
+                std::string cmd = p["command"].s();
+                if (cmd=="CLIENT_REQUEST" && p.has("data"))
+                    for (auto& n : nodes)
+                        n->clientRequest(p["data"].s());
+                else if (p.has("nodeId")) {
+                    int id = p["nodeId"].i();
+                    if (id>=1 && id<=(int)nodes.size()) {
+                        if (cmd=="CRASH_NODE")   nodes[id-1]->crash();
+                        if (cmd=="RECOVER_NODE") nodes[id-1]->recover();
+                    }
+                }
+            }
+        });
+
+    app.port(8080).multithreaded().run();
+    return 0;
+}
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 9: Redux State Management and the WebSocket Hook}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+On the frontend, the challenge is managing a stream of high-frequency,
+partial state updates and reflecting them in a reactive UI. Redux Toolkit's
+\texttt{createSlice} provides an immutable, globally accessible state
+container. A custom Hook (\texttt{useRaftWebSocket}) manages the WebSocket
+lifecycle and feeds incoming messages into the Redux store.
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Redux Toolkit / Immer:} The reducer appears to mutate
+          state directly. Redux Toolkit wraps reducers with Immer, which
+          intercepts assignments on a Proxy draft and produces a new
+          immutable state tree transparently.
+    \item \textbf{useRef for the socket:} Updating a ref does \textit{not}
+          trigger a re-render. This is critical because the WebSocket
+          transitions through internal states (CONNECTING, OPEN, CLOSING,
+          CLOSED) frequently.
+    \item \textbf{Cleanup function:} The function returned from
+          \texttt{useEffect} closes the socket on unmount, preventing zombie
+          connections from calling \texttt{dispatch} on a destroyed component.
+    \item \textbf{Polymorphic sendCommand:} Inspects \texttt{typeof payload}
+          at runtime to route either a \texttt{nodeId} number or a
+          \texttt{data} string, serving all UI panels from one function.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=tsstyle, caption={frontend/src/store/raftSlice.ts}]
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+export interface LogEntry { term: number; command: string; }
+export interface RaftNodeState {
+  nodeId: number; term: number;
+  role: number; commitIndex: number;
+  isCrashed: boolean; log: LogEntry[];
+}
+interface RaftPayload {
+  nodeId: number; term: number; role: number;
+  commitIndex: number; isCrashed?: boolean; log?: LogEntry[];
+}
+
+export const raftSlice = createSlice({
+  name: 'raft',
+  initialState: {
+    nodes: {
+      1:{nodeId:1,term:0,role:0,commitIndex:0,isCrashed:false,log:[]},
+      2:{nodeId:2,term:0,role:0,commitIndex:0,isCrashed:false,log:[]},
+      3:{nodeId:3,term:0,role:0,commitIndex:0,isCrashed:false,log:[]},
+      4:{nodeId:4,term:0,role:0,commitIndex:0,isCrashed:false,log:[]},
+      5:{nodeId:5,term:0,role:0,commitIndex:0,isCrashed:false,log:[]},
+    } as Record<number, RaftNodeState>
+  },
+  reducers: {
+    updateNodeState:(state, action: PayloadAction<RaftPayload>) => {
+      const { nodeId, term, role, commitIndex, isCrashed, log }
+        = action.payload;
+      if (state.nodes[nodeId]) {
+        state.nodes[nodeId].term        = term;
+        state.nodes[nodeId].role        = role;
+        state.nodes[nodeId].commitIndex = commitIndex;
+        if (isCrashed!==undefined)
+          state.nodes[nodeId].isCrashed = isCrashed;
+        if (log!==undefined)
+          state.nodes[nodeId].log = log;
+      }
+    }
+  }
+});
+\end{lstlisting}
+
+\begin{lstlisting}[style=tsstyle, caption={frontend/src/hooks/useRaftWebSocket.ts}]
+import { useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
+import { updateNodeState } from '../store/raftSlice';
+
+export const useRaftWebSocket = (url: string) => {
+  const dispatch = useDispatch();
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    ws.current = new WebSocket(url);
+    ws.current.onmessage = (event) => {
+      try { dispatch(updateNodeState(JSON.parse(event.data))); }
+      catch (e) { console.error('Parse error', e); }
+    };
+    return () => {
+      if (ws.current?.readyState === WebSocket.OPEN)
+        ws.current.close();
+    };
+  }, [url, dispatch]);
+
+  const sendCommand = (command: string, payload?: any) => {
+    if (ws.current?.readyState !== WebSocket.OPEN) return;
+    if (typeof payload === 'number')
+      ws.current.send(JSON.stringify({ command, nodeId: payload }));
+    else if (typeof payload === 'string')
+      ws.current.send(JSON.stringify({ command, data: payload }));
+    else
+      ws.current.send(JSON.stringify({ command }));
+  };
+
+  return { sendCommand };
+};
+\end{lstlisting}
+
+\newpage
+
+% =====================================================================
+\section{Step 10: React UI---Visualization and Chaos Engineering}
+% =====================================================================
+
+\subsection{Conceptual Overview}
+The final layer transforms Redux state into a living, interactive
+visualization. \texttt{ClusterView} orchestrates the layout;
+\texttt{NodeCard} visualizes each node; \texttt{ChaosControlPanel} and
+\texttt{ClientPanel} enable interactive fault injection and log mutations.
+Every state change in the C++ backend appears in the UI within one 50ms
+heartbeat cycle.
+
+\subsection{The Building Process}
+Component hierarchy:
+\begin{center}
+\texttt{App} $\rightarrow$ \texttt{ClusterView} $\rightarrow$
+\{\texttt{NodeCard}$\times$5, \texttt{ClientPanel}, \texttt{ChaosControlPanel}\}
+\end{center}
+Only \texttt{ClusterView} calls \texttt{useRaftWebSocket}, obtaining
+\texttt{sendCommand} and passing it as props to child panels.
+
+\subsection{Implementation Details}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Role-based styling:} \texttt{NodeCard} maps
+          \texttt{node.role} (0/1/2) to distinct Tailwind CSS class sets.
+          Crashed nodes receive a desaturated red style.
+    \item \textbf{Log display:} \texttt{node.log.slice(-2)} provides a
+          rolling two-entry window without overflowing the card height.
+    \item \textbf{ChaosControlPanel:} Renders Crash/Recover buttons per node.
+          Buttons are disabled based on \texttt{node.isCrashed} to prevent
+          double-crashing.
+    \item \textbf{ClientPanel:} A controlled form that dispatches
+          \texttt{CLIENT\_REQUEST} and resets its input on submit.
+\end{itemize}
+
+\subsection{Code \& Configuration}
+\begin{lstlisting}[style=tsstyle, caption={frontend/src/components/NodeCard.tsx}]
+import React from 'react';
+import type { RaftNodeState } from '../store/raftSlice';
+
+export const NodeCard: React.FC<{node: RaftNodeState}> = ({ node }) => {
+  const roleStyles: Record<number,string> = {
+    0: 'bg-slate-800 border-slate-600 text-slate-300',
+    1: 'bg-amber-600 border-amber-400 text-white',
+    2: 'bg-blue-600 border-blue-400 text-white shadow-[0_0_20px_rgba(37,99,235,0.7)]'
+  };
+  const roleNames: Record<number,string> = {
+    0:'FOLLOWER', 1:'CANDIDATE', 2:'LEADER'
+  };
+  const currentStyle = node.isCrashed
+    ? 'bg-red-950 border-red-800 text-red-500 opacity-60'
+    : roleStyles[node.role];
+  const roleName = node.isCrashed
+    ? 'CRASHED' : roleNames[node.role];
+
+  return (
+    <div className={`flex flex-col p-6 m-3 rounded-2xl border-2
+                     transition-all duration-300 ${currentStyle}`}>
+      <h2 className="text-3xl font-bold mb-2">Node {node.nodeId}</h2>
+      <div className="tracking-widest mb-5">{roleName}</div>
+      <div className="font-mono space-y-2">
+        <p>Term: {node.term}</p>
+        <p>Commit Idx: {node.commitIndex}</p>
+        {node.log.length > 0 && (
+          <ul>
+            {node.log.slice(-2).map((e, i) => (
+              <li key={i}>
+                <span>T{e.term} </span>
+                <span className="text-emerald-300">{e.command}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+\end{lstlisting}
+
+\begin{lstlisting}[style=tsstyle, caption={frontend/src/components/ClientPanel.tsx}]
+import React, { useState } from 'react';
+
+interface ClientPanelProps {
+  onSendCommand: (command: string, data?: string) => void;
+}
+
+export const ClientPanel: React.FC<ClientPanelProps> = ({onSendCommand}) => {
+  const [inputValue, setInputValue] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputValue.trim()) {
+      onSendCommand('CLIENT_REQUEST', inputValue.trim());
+      setInputValue('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-4">
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        placeholder="e.g. SET X=10"
+        className="flex-1 px-4 py-2 bg-slate-900 border rounded text-white"
+      />
+      <button type="submit" disabled={!inputValue.trim()}
+              className="px-6 py-2 bg-blue-600 disabled:bg-slate-600
+                         text-white font-bold rounded">
+        Send to Leader
+      </button>
+    </form>
+  );
+};
+\end{lstlisting}
+
+\section*{Codebase Modifications: Cloud Deployment}
+To deploy the Raft Consensus Simulator to Render (backend) and Vercel (frontend), the following architectural changes were made:
+\begin{itemize}
+    \item \textbf{Backend Dockerization:} Created a \texttt{Dockerfile} for the C++ backend using \texttt{ubuntu:22.04} to compile and serve the binary, enabling deployment as a Web Service on Render since Render does not provide a native C++ runtime.
+    \item \textbf{Port Binding Update:} Modified \texttt{backend/src/main.cpp} to dynamically read the \texttt{PORT} environment variable (defaulting to 8080) and bind the Crow WebSocket server to \texttt{0.0.0.0} instead of \texttt{localhost}. This is required for Render to properly route external traffic to the container.
+    \item \textbf{Frontend Environment Variables:} Updated \texttt{frontend/src/components/ClusterView.tsx} to read the WebSocket URL from Vite environment variables (\texttt{import.meta.env.VITE\_WS\_URL}) rather than hardcoding \texttt{ws://localhost:8080/raft}. This allows Vercel to dynamically point the frontend to the deployed Render backend in production.
+\end{itemize}
+
+\end{document}

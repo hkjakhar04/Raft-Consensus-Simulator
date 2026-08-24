@@ -1,0 +1,46 @@
+\contentsline {section}{\numberline {1}Step 1: Project Architecture and Technology Selection}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Conceptual Overview}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}The Building Process}{2}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Implementation Details}{2}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Code \& Configuration}{2}{subsection.1.4}%
+\contentsline {section}{\numberline {2}Step 2: Defining the Raft Data Model (Types.h)}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Conceptual Overview}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}The Building Process}{4}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Implementation Details}{4}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Code \& Configuration}{4}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Step 3: The Thread-Safe Telemetry Infrastructure}{6}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Conceptual Overview}{6}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}The Building Process}{6}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Implementation Details}{6}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Code \& Configuration}{6}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Step 4: The Node Class Interface (Node.h)}{8}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Conceptual Overview}{8}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}The Building Process}{8}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Implementation Details}{8}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Code \& Configuration}{8}{subsection.4.4}%
+\contentsline {section}{\numberline {5}Step 5: The Node Lifecycle---Run Loop and Leader Election}{10}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Conceptual Overview}{10}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}The Building Process}{10}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Implementation Details}{10}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Code \& Configuration}{10}{subsection.5.4}%
+\contentsline {section}{\numberline {6}Step 6: The RequestVote and AppendEntries RPCs}{12}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Conceptual Overview}{12}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Implementation Details}{12}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Code \& Configuration}{12}{subsection.6.3}%
+\contentsline {section}{\numberline {7}Step 7: Leader Heartbeats, Log Replication, and Commitment}{14}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Conceptual Overview}{14}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Implementation Details}{14}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Code \& Configuration}{14}{subsection.7.3}%
+\contentsline {section}{\numberline {8}Step 8: The Orchestrator---main.cpp}{16}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Conceptual Overview}{16}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Implementation Details}{16}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Code \& Configuration}{16}{subsection.8.3}%
+\contentsline {section}{\numberline {9}Step 9: Redux State Management and the WebSocket Hook}{18}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Conceptual Overview}{18}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Implementation Details}{18}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Code \& Configuration}{18}{subsection.9.3}%
+\contentsline {section}{\numberline {10}Step 10: React UI---Visualization and Chaos Engineering}{20}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Conceptual Overview}{20}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}The Building Process}{20}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Implementation Details}{20}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Code \& Configuration}{20}{subsection.10.4}%

@@ -7,7 +7,8 @@ import { ClientPanel } from './ClientPanel';
 import type { RootState } from '../store/store'; 
 
 export const ClusterView: React.FC = () => {
-  const { sendCommand } = useRaftWebSocket('ws://localhost:8080/raft');
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/raft';
+  const { sendCommand } = useRaftWebSocket(wsUrl);
 
   const nodes = useSelector((state: RootState) => state.raft.nodes);
   const nodesArray = Object.values(nodes);
