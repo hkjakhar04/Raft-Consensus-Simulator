@@ -1133,4 +1133,44 @@ To deploy the Raft Consensus Simulator to Render (backend) and Vercel (frontend)
     \item \textbf{Frontend Environment Variables:} Updated \texttt{frontend/src/components/ClusterView.tsx} to read the WebSocket URL from Vite environment variables (\texttt{import.meta.env.VITE\_WS\_URL}) rather than hardcoding \texttt{ws://localhost:8080/raft}. This allows Vercel to dynamically point the frontend to the deployed Render backend in production.
 \end{itemize}
 
+\section*{Project Structure Changes}
+\begin{itemize}
+    \item Created \texttt{resume\_points.md} in the root directory to store ATS-optimized technical bullet points.
+\end{itemize}
+
+\section*{Project Documentation Updates}
+\begin{itemize}
+    \item Overwrote the contents of \texttt{resume\_points.md} with highly-quantified, ATS-optimized bullet points detailing exact network latencies, threading primitives, and React rendering constraints.
+    \item Integrated GoogleTest (gtest) into the C++ backend via CMake FetchContent.
+    \item Added unit tests in \texttt{backend/tests/test\_raft\_core.cpp} to automatically verify Raft leader election logic and state transitions (e.g., rejecting votes from older terms).
+    \item \textbf{Test Execution Results (2026-08-24):} 
+    \begin{verbatim}
+1/4 Test #1: RaftNodeTest.RejectsOldTermVote ...............   Passed    0.03 sec
+2/4 Test #2: RaftNodeTest.GrantsVoteForHigherTerm ..........   Passed    0.02 sec
+3/4 Test #3: RaftNodeTest.RejectsDuplicateVoteInSameTerm ...   Passed    0.02 sec
+4/4 Test #4: RaftNodeTest.AppendEntriesRejectsOldTerm ......   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 4
+    \end{verbatim}
+    \item Condensed \texttt{resume\_points.md} to single-line ATS bullet points without stripping critical technical constraints.
+    \item Hyper-condensed the bullet points to strictly fit within 110 characters for standard resume single-line margins.
+    \item Restored Point 2 to its expanded two-line format and removed Point 4 to minimize frontend-focused interview questions.
+    \item Trimmed Point 2 slightly to ensure it fits perfectly on exactly 2 lines (avoiding 3-line wrap).
+\end{itemize}
+
 \end{document}
+\section*{Project Structural Changes: Dockerization}
+\begin{itemize}
+    \item Created \texttt{frontend/Dockerfile} using a multi-stage build (Node.js for building, Nginx for serving).
+    \item Created \texttt{frontend/nginx.conf} to serve static assets and reverse proxy WebSocket connections to the backend.
+    \item Created \texttt{docker-compose.yml} to orchestrate both the frontend and backend containers, exposing port 80 to the host.
+\end{itemize}
+\section*{Bug Fix: Render Deployment}
+\begin{itemize}
+    \item Fixed \texttt{backend/Dockerfile} to install \texttt{libasio-dev} via \texttt{apt-get} instead of referencing the local \texttt{asio} directory, which was ignored in \texttt{.gitignore} and causing Render builds to fail with status 1.
+\end{itemize}
+\section*{UI Updates: Custom Logo}
+\begin{itemize}
+    \item Generated a custom minimalist geometry logo for the Raft Simulator.
+    \item Updated \texttt{frontend/index.html} to use \texttt{logo.jpg} as the new favicon and renamed the generic document title to "Raft Simulator".
+\end{itemize}
