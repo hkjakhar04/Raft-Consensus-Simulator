@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y g++ make
+RUN apt-get update && apt-get install -y g++ make libasio-dev
 
 # Set working directory
 WORKDIR /app
@@ -10,7 +10,7 @@ WORKDIR /app
 COPY . .
 
 # Compile the C++ backend
-RUN g++ -I./src -I./asio-asio-1-28-0/asio/include -o raft_simulator src/main.cpp src/raft_core/Node.cpp -lpthread
+RUN g++ -I./src -o raft_simulator src/main.cpp src/raft_core/Node.cpp -lpthread
 
 # Expose the WebSocket port
 EXPOSE 8080
