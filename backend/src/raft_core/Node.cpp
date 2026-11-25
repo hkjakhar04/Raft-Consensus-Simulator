@@ -27,6 +27,9 @@ void Node::recover() {
 }
 
 void Node::clientRequest(const std::string& command) {
+    // Client thread: Checks the node is leader.
+    // RPC thread:    Receives a higher term and changes it to follower.
+    // Client thread: Appends the command, assuming it is still leader.
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_state != NodeState::LEADER || m_isCrashed) {
         return; // Only leaders process client requests
@@ -59,6 +62,7 @@ void Node::stop() {
 
 void Node::setRpcHandler(std::function<RequestVoteReply(int, const RequestVoteArgs&)> requestVoteFunc,
                          std::function<AppendEntriesReply(int, const AppendEntriesArgs&)> appendEntriesFunc) {
+    // stores requestVoteFunc and appendEntriesFunc for later use in sendRequestVote and sendAppendEntries
     sendRequestVote = std::move(requestVoteFunc);
     sendAppendEntries = std::move(appendEntriesFunc);
 }
@@ -84,13 +88,16 @@ void Node::emitTelemetry(telemetry::EventType type, const std::string& message) 
 
 void Node::run() {
     while (m_running) {
+        // Worker:    Reads the old timer and decides it expired.
+        // RPC thread: Receives a heartbeat and resets the timer.
+        // Worker:    Starts an election based on its outdated check.
         std::unique_lock<std::mutex> lock(m_mutex);
         
         auto now = std::chrono::steady_clock::now();
         if (!m_isCrashed && m_state != NodeState::LEADER && now - m_lastHeartbeat >= m_electionTimeout) {
             startElection();
         }
-
+// waits for 50ms before checking again and if the node is stopped(the lambda function tells it to stop) then it will exit the loop and terminate the thread
         m_cv.wait_for(lock, std::chrono::milliseconds(50), [this]() {
             return !m_running;
         });
@@ -183,72 +190,71 @@ void Node::becomeLeader() {
                     break;
                 }
 
-                if (m_isCrashed) {
-                    continue; // Skip sending heartbeats if crashed
-                }
+                // Skip sending while crashed, but still wait after unlocking.
+                if (!m_isCrashed) {
+                    for (int peerId : m_peerIds) {
+                        AppendEntriesArgs args;
+                        args.term = m_currentTerm;
+                        args.leaderId = m_id;
+                        args.leaderCommit = m_commitIndex;
 
-                for (int peerId : m_peerIds) {
-                    AppendEntriesArgs args;
-                    args.term = m_currentTerm;
-                    args.leaderId = m_id;
-                    args.leaderCommit = m_commitIndex;
+                        int nextIdx = m_nextIndex[peerId];
+                        args.prevLogIndex = nextIdx - 1;
+                        args.prevLogTerm = (args.prevLogIndex > 0 && args.prevLogIndex <= m_log.size())
+                                            ? m_log[args.prevLogIndex - 1].term : 0;
 
-                    int nextIdx = m_nextIndex[peerId];
-                    args.prevLogIndex = nextIdx - 1;
-                    args.prevLogTerm = (args.prevLogIndex > 0 && args.prevLogIndex <= m_log.size()) 
-                                        ? m_log[args.prevLogIndex - 1].term : 0;
-                    
-                    if (nextIdx > 0 && nextIdx <= m_log.size()) {
-                        args.entries = std::vector<LogEntry>(m_log.begin() + nextIdx - 1, m_log.end());
-                    } else {
-                        args.entries = {}; 
-                    } 
-
-                    // Fire-and-forget concurrent RPC
-                    std::thread([this, peerId, args]() {
-                        if (!sendAppendEntries) return;
-                        
-                        // Block during RPC call
-                        AppendEntriesReply reply = sendAppendEntries(peerId, args);
-
-                        // Process reply
-                        std::lock_guard<std::mutex> lock(m_mutex);
-                        if (m_state != NodeState::LEADER || m_currentTerm != args.term) {
-                            return; // Stale reply
+                        if (nextIdx > 0 && nextIdx <= m_log.size()) {
+                            args.entries = std::vector<LogEntry>(m_log.begin() + nextIdx - 1, m_log.end());
+                        } else {
+                            args.entries = {};
                         }
 
-                        if (reply.term > m_currentTerm) {
-                            becomeFollower(reply.term);
-                            return;
-                        }
+                        // Fire-and-forget concurrent RPC
+                        std::thread([this, peerId, args]() {
+                            if (!sendAppendEntries) return;
 
-                        // Log matching processing
-                        if (reply.success) {
-                            int matchIdx = args.prevLogIndex + args.entries.size();
-                            if (matchIdx > m_matchIndex[peerId]) {
-                                m_matchIndex[peerId] = matchIdx;
-                                m_nextIndex[peerId] = matchIdx + 1;
-                                
-                                // Update commitIndex
-                                for (int n = m_log.size(); n > m_commitIndex; --n) {
-                                    if (m_log[n - 1].term == m_currentTerm) {
-                                        int count = 1; // self
-                                        for (int p : m_peerIds) {
-                                            if (m_matchIndex[p] >= n) count++;
-                                        }
-                                        if (count > (m_peerIds.size() + 1) / 2) {
-                                            m_commitIndex = n;
-                                            emitTelemetry(telemetry::EventType::STATE_TRANSITION, "Committed log idx " + std::to_string(n));
-                                            break;
+                            // Block during RPC call
+                            AppendEntriesReply reply = sendAppendEntries(peerId, args);
+
+                            // Process reply
+                            std::lock_guard<std::mutex> lock(m_mutex);
+                            if (m_state != NodeState::LEADER || m_currentTerm != args.term) {
+                                return; // Stale reply
+                            }
+
+                            if (reply.term > m_currentTerm) {
+                                becomeFollower(reply.term);
+                                return;
+                            }
+
+                            // Log matching processing
+                            if (reply.success) {
+                                int matchIdx = args.prevLogIndex + args.entries.size();
+                                if (matchIdx > m_matchIndex[peerId]) {
+                                    m_matchIndex[peerId] = matchIdx;
+                                    m_nextIndex[peerId] = matchIdx + 1;
+
+                                    // Update commitIndex
+                                    for (int n = m_log.size(); n > m_commitIndex; --n) {
+                                        if (m_log[n - 1].term == m_currentTerm) {
+                                            int count = 1; // self
+                                            for (int p : m_peerIds) {
+                                                if (m_matchIndex[p] >= n) count++;
+                                            }
+                                            if (count > (m_peerIds.size() + 1) / 2) {
+                                                m_commitIndex = n;
+                                                emitTelemetry(telemetry::EventType::STATE_TRANSITION, "Committed log idx " + std::to_string(n));
+                                                break;
+                                            }
                                         }
                                     }
                                 }
+                            } else {
+                                // Decrement nextIndex to retry
+                                m_nextIndex[peerId] = std::max(1, m_nextIndex[peerId] - 1);
                             }
-                        } else {
-                            // Decrement nextIndex to retry
-                            m_nextIndex[peerId] = std::max(1, m_nextIndex[peerId] - 1);
-                        }
-                    }).detach();
+                        }).detach();
+                    }
                 }
             } // Unlock before sleeping
 
